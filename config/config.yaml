@@ -5,7 +5,20 @@ camera:
   height: 480
   fps: 30
   mirror: false     # NO activar: el espejo rompe la geometría de la calibración
+  autofocus: false  # el autoenfoque cambia la focal y invalida la calibración
 
 display:
   window_name: "Torreta antidron"
   snapshot_dir: "data/snapshots"
+
+calibration:
+  # Tablero de ajedrez: número de CUADROS (no de esquinas). Esquinas interiores = cuadros - 1
+  squares_x: 11       # cuadros en horizontal  -> 10 esquinas interiores
+  squares_y: 8        # cuadros en vertical    -> 7 esquinas interiores
+  square_mm: 20.0     # lado del cuadro medido en la impresión
+  images_dir: "calibration/images"
+  output: "calibration/calib.yaml"
+  figures_dir: "docs/figures/calibration"
+  val_fraction: 0.2   # fracción de imágenes reservadas para el RMS de validación
+  seed: 0             # semilla de la partición entrenamiento/validación
+  alpha: 0.0          # getOptimalNewCameraMatrix: 0 = sin bordes negros, 1 = conserva todos los píxeles

@@ -41,19 +41,24 @@ Objetivo del equipo: **el 10**. Cada módulo debe respaldarse con una medida en 
 ## Estado actual del repo
 
 ```text
-src/main.py      bucle en tiempo real: captura, FPS, 's' guarda frame en data/snapshots/
-src/camera.py    ThreadedCamera: captura en un hilo (CAP_DSHOW en Windows)
-src/fps.py       FPSCounter (EMA) y draw_stats (overlay)
-config/config.yaml   parámetros (cámara, display)
-tests/test_fps.py    tests con pytest
-calibration/images/  (vacío) · docs/figures/ · data/ (ignorado por git)
+src/main.py          bucle en tiempo real: FPS, 's' guarda frame, 'u' corrige distorsión
+src/camera.py        ThreadedCamera: captura en un hilo (CAP_DSHOW), autofocus configurable
+src/fps.py           FPSCounter (EMA) y draw_stats (overlay)
+src/settings.py      ROOT, load_config, project_path
+src/calib_utils.py   board_points, find_corners, calibrate, RMS de validación, YAML
+src/camera_model.py  CameraModel: undistort (remap), pixel_to_angles, depth_from_diameter
+calibration/         make_chessboard.py, capture.py, calibrate.py, calib.yaml, images/ (47 fotos)
+                     HECHO: RMS 0.220 px, validación 0.229 px, fx≈495, 4 coef. (k3 no aporta), remap ≈1 ms, 30 FPS
+config/config.yaml   cámara, display, calibration
+tests/               pytest (pytest.ini: pythonpath=src); synth.py = cámara virtual para tests
+docs/figures/calibration/ · data/ (ignorado por git)
 .gitattributes / .gitignore (.venv y data/ excluidos)
 ```
 
 ## Diseño acordado por módulo
 
-1. **Calibración** — scripts en `calibration/`: `make_chessboard.py` (PDF A4, 9×6 esquinas interiores, cuadro 25 mm,
-   regla de 50 mm para verificar escala), `capture.py` (detección en vivo, guardar con espacio, mapa de cobertura),
+1. **Calibración** — scripts en `calibration/`: `make_chessboard.py` (PDF A4, tablero de 11×8 cuadros = 10×7 esquinas
+   interiores, cuadro 20 mm, regla de 50 mm para verificar escala), `capture.py` (detección en vivo, guardar con espacio, mapa de cobertura),
    `calibrate.py` (findChessboardCorners + cornerSubPix + calibrateCamera; RMS y **RMS de validación** con imágenes
    no usadas; error por imagen; guarda `calibration/calib.yaml`; figuras para el informe).
    Runtime en `src/camera_model.py`: carga YAML, mapas `initUndistortRectifyMap` + `remap` (tecla `u` en main),

@@ -1,7 +1,8 @@
 """Punto de entrada del sistema.
 
-Primera versión: lee la cámara en tiempo real y muestra los FPS en cada frame.
-Los módulos (calibración, seguridad, tracker, torreta) se irán conectando aquí.
+Lee la cámara en tiempo real y muestra los FPS en cada frame. Si existe
+calibration/calib.yaml, la tecla 'u' activa la corrección de distorsión.
+Los módulos (seguridad, tracker, torreta) se irán conectando aquí.
 
 Uso:
     python src/main.py
@@ -10,30 +11,41 @@ Uso:
 Teclas:
     q / ESC  salir
     s        guardar el frame actual en data/snapshots/
+    u        activar/desactivar la corrección de distorsión
 """
+from __future__ import annotations
+
 import argparse
 import time
 from pathlib import Path
 
 import cv2
-import yaml
 
 from camera import ThreadedCamera
+from camera_model import CameraModel
 from fps import FPSCounter, draw_stats
-
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def load_config(path: Path) -> dict:
-    with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+from settings import DEFAULT_CONFIG, ROOT, load_config, project_path
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Torreta antidrón virtual")
-    p.add_argument("--config", type=Path, default=ROOT / "config" / "config.yaml")
+    p.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     p.add_argument("--camera", type=int, help="índice de la cámara (sobrescribe la config)")
     return p.parse_args()
+
+
+def load_camera_model(cfg: dict, resolution) -> CameraModel | None:
+    cal = cfg.get("calibration", {})
+    path = project_path(cal.get("output", "calibration/calib.yaml"))
+    if not path.exists():
+        print(f"Sin calibración ({path}): ejecuta calibration/capture.py y calibration/calibrate.py")
+        return None
+    model = CameraModel.from_yaml(path, alpha=float(cal.get("alpha", 0.0)))
+    if model.size != tuple(resolution):
+        print(f"AVISO: calibración a {model.size} y cámara a {resolution}: corrección desactivada")
+        return None
+    print(f"Calibración cargada de {path}. Pulsa 'u' para corregir la distorsión.")
+    return model
 
 
 def main() -> None:
@@ -48,10 +60,13 @@ def main() -> None:
 
     fps = FPSCounter()
     last_id = -1
+    undistort = False
 
-    with ThreadedCamera(index, cam_cfg["width"], cam_cfg["height"], cam_cfg["fps"]) as cam:
+    with ThreadedCamera(index, cam_cfg["width"], cam_cfg["height"], cam_cfg["fps"],
+                        cam_cfg.get("autofocus")) as cam:
         w, h = cam.resolution
         print(f"Cámara {index} abierta a {w}x{h}. Pulsa 'q' para salir, 's' para capturar.")
+        model = load_camera_model(cfg, (w, h))
 
         while True:
             frame_id, frame = cam.read()
@@ -64,11 +79,14 @@ def main() -> None:
             t0 = time.perf_counter()
             if cam_cfg.get("mirror", False):
                 frame = cv2.flip(frame, 1)
+            if undistort:
+                frame = model.undistort(frame)
             # --- aquí se conectarán los módulos del sistema ---
             proc_ms = (time.perf_counter() - t0) * 1000
 
             out = frame.copy()
-            draw_stats(out, [f"FPS: {fps.tick():.1f}", f"Proc: {proc_ms:.1f} ms", f"{w}x{h}"])
+            draw_stats(out, [f"FPS: {fps.tick():.1f}", f"Proc: {proc_ms:.1f} ms",
+                             f"{w}x{h}  {'CORREGIDA' if undistort else 'original'}"])
             cv2.imshow(window, out)
 
             key = cv2.waitKey(1) & 0xFF
@@ -79,6 +97,11 @@ def main() -> None:
                 name = snapshot_dir / f"snap_{time.strftime('%Y%m%d_%H%M%S')}_{frame_id}.png"
                 cv2.imwrite(str(name), frame)  # se guarda sin overlay
                 print(f"Guardado {name}")
+            if key == ord("u"):
+                if model is None:
+                    print("No hay calibración válida para corregir la distorsión")
+                else:
+                    undistort = not undistort
 
     cv2.destroyAllWindows()
 

@@ -14,7 +14,8 @@ import cv2
 
 
 class ThreadedCamera:
-    def __init__(self, index: int = 0, width: int = 640, height: int = 480, fps: int = 30):
+    def __init__(self, index: int = 0, width: int = 640, height: int = 480, fps: int = 30,
+                 autofocus: bool | None = None):
         # En Windows, DirectShow abre la cámara más rápido y sin avisos
         backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_ANY
         self.cap = cv2.VideoCapture(index, backend)
@@ -25,6 +26,10 @@ class ThreadedCamera:
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_FPS, fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # no acumular frames viejos
+        if autofocus is not None:
+            # Con el autoenfoque activo la focal cambia y la calibración deja de valer.
+            # Si la cámara no lo soporta, set() devuelve False y no pasa nada.
+            self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1 if autofocus else 0)
 
         ok, frame = self.cap.read()
         if not ok:
