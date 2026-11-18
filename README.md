@@ -6,7 +6,7 @@ Una cámara real fija vigila una zona por la que se mueven objetivos físicos (p
 
 Todo es visión por ordenador clásica con Python y OpenCV, sin deep learning y sin hardware adicional.
 
-> **Estado:** primera versión: lectura de la cámara en tiempo real con FPS en pantalla.
+> **Estado:** cámara en tiempo real con FPS y calibración offline con corrección de distorsión.
 
 ## Equipo
 
@@ -47,10 +47,26 @@ python src/main.py --camera 1 # otra cámara
 pytest                        # tests
 ```
 
+### Calibración de la cámara (offline, una vez)
+
+Tablero de 11×8 cuadros de 20 mm (10×7 esquinas interiores); las medidas están en `config/config.yaml`.
+
+```bash
+python calibration/make_chessboard.py   # PDF A4: imprimir al 100 % y comprobar la regla de 50 mm
+python calibration/capture.py           # ESPACIO guarda, z deshace, q sale (20-30 imágenes)
+python calibration/calibrate.py         # K, distorsión, RMS y RMS de validación -> calibration/calib.yaml
+```
+
+`calibrate.py` reserva un 20 % de las imágenes para medir el **RMS de validación** (error de
+reproyección en imágenes no usadas), compara el modelo de distorsión de 4 y 5 coeficientes y guarda
+las figuras del informe en `docs/figures/calibration/`. Con `--no-curve` omite la curva de error frente al
+número de imágenes, que es la parte lenta.
+
 | Tecla | Acción |
 | --- | --- |
 | `q` / `Esc` | Salir |
 | `s` | Guardar el frame actual en `data/snapshots/` |
+| `u` | Activar/desactivar la corrección de distorsión (requiere `calibration/calib.yaml`) |
 
 ## Estructura del repositorio
 
@@ -59,9 +75,12 @@ torreta-antidron/
 ├── src/                # código del sistema
 │   ├── main.py         # punto de entrada y bucle en tiempo real
 │   ├── camera.py       # captura en un hilo aparte
+│   ├── camera_model.py # corrección de distorsión, píxel -> ángulos, profundidad
+│   ├── calib_utils.py  # detección del tablero, calibración, RMS de validación
+│   ├── settings.py     # rutas y lectura de la config
 │   └── fps.py          # FPS y overlay de rendimiento
 ├── config/config.yaml  # parámetros (cámara, umbrales, código de armado...)
-├── calibration/        # imágenes del tablero y resultado calib.yaml
+├── calibration/        # scripts de calibración, imágenes del tablero y calib.yaml
 ├── tests/              # tests con pytest
 ├── docs/figures/       # figuras del informe
 └── data/               # vídeos y capturas de prueba (no se suben al repo)
@@ -70,7 +89,7 @@ torreta-antidron/
 ## Hoja de ruta
 
 - [x] Lectura de la cámara en tiempo real con FPS
-- [ ] Calibración offline (K, distorsión, RMS) y corrección de distorsión
+- [x] Calibración offline (K, distorsión, RMS) y corrección de distorsión (RMS 0.22 px, validación 0.23 px)
 - [ ] Detector de tarjetas de armado
 - [ ] Decodificador de secuencia (máquina de estados)
 - [ ] Detección y tracking multiobjetivo (Kalman + asignación húngara)

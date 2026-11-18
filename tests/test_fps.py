@@ -1,9 +1,4 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from fps import FPSCounter  # noqa: E402
+from fps import FPSCounter
 
 
 def test_fps_converges_to_constant_rate():

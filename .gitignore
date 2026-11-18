@@ -13,6 +13,9 @@ data/*
 *.avi
 *.mov
 
+# Imágenes PNG (fotos de calibración, figuras generadas): se regeneran con los scripts
+*.png
+
 # Sistema operativo y editores
 .DS_Store
 Thumbs.db
