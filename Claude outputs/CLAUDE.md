@@ -11,7 +11,7 @@ se **arma**: detecta y sigue cada objetivo (Kalman + asignación húngara) y una
 en pantalla gira, apunta con adelanto y dispara un proyectil virtual. Sin hardware adicional.
 
 - **Equipo (grupo A):** Hugo Lara Rodríguez, Pablo Santiago Hernández Muñoz
-- **Repo:** https://github.com/i1oc/torreta-antidron (público)
+- **Repo:** https://github.com/i1oc/anti-drone-turret (público; antes torreta-antidron)
 - **Identidad git:** los commits deben salir como `i1oc <i1oc@proton.me>` (configurado en local). Nunca como `ppx005`.
 - **Entrega final y presentación: 2 de diciembre de 2026.** Propuesta ya entregada.
 
