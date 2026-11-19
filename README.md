@@ -20,8 +20,8 @@ Group: A
 Requirements: **Python 3.9** and Git. Library versions are those of the course lab environment ([icai-voi/voi-26-27](https://github.com/icai-voi/voi-26-27)); OpenCV 4.8 and NumPy 1.26 have no builds for Python 3.13 or later.
 
 ```bash
-git clone https://github.com/<user>/torreta-antidron.git
-cd torreta-antidron
+git clone https://github.com/i1oc/anti-drone-turret.git
+cd anti-drone-turret
 
 # Windows
 py -3.9 -m venv .venv
@@ -79,7 +79,7 @@ rotation-invariant features (number of pieces and holes, fill relative to the en
 ## Repository structure
 
 ```text
-torreta-antidron/
+anti-drone-turret/
 ├── src/                # system code
 │   ├── main.py         # entry point and real-time loop
 │   ├── camera.py       # capture in a separate thread
