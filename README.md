@@ -10,14 +10,10 @@ Everything is classical computer vision with Python and OpenCV, with no deep lea
 
 ## Team
 
-| Member | Main module |
-| --- | --- |
-| _First Last_ | Calibration and geometry |
-| _First Last_ | Cards and decoder |
-| _First Last_ | Detection and tracking |
-| _First Last_ | Integration, evaluation and documentation |
+- Hugo Lara Rodríguez
+- Pablo Santiago Hernández Muñoz
 
-Group: _A / B_
+Group: A
 
 ## Installation
 
