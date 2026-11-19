@@ -1,4 +1,4 @@
-"""Rutas del proyecto y lectura de config/config.yaml (compartido por main y scripts)."""
+"""Project paths and loading of config/config.yaml (shared by main and the scripts)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,6 +15,6 @@ def load_config(path: str | Path = DEFAULT_CONFIG) -> dict:
 
 
 def project_path(p: str | Path) -> Path:
-    """Rutas relativas de la config se interpretan desde la raíz del repo."""
+    """Relative paths in the config are resolved from the repo root."""
     p = Path(p)
     return p if p.is_absolute() else ROOT / p

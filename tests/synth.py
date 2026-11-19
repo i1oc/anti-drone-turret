@@ -1,7 +1,7 @@
-"""Cámara virtual para los tests: genera vistas del tablero con K y distorsión conocidas.
+"""Virtual camera for the tests: generates board views with known K and distortion.
 
-Permite comprobar la calibración sin cámara física: se conoce la verdad y se
-mide cuánto se acerca lo estimado.
+Allows checking the calibration without a physical camera: the ground truth is
+known and we measure how close the estimate gets.
 """
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ PX_PER_SQUARE = 40
 
 def random_pose(rng, K=K_TRUE, dist=DIST_TRUE, size=SIZE, squares=SQUARES, square=SQUARE_MM,
                 max_angle_deg=35.0, z_range=(350.0, 650.0)):
-    """Pose aleatoria (rvec, tvec) con el tablero entero (y un cuadro de margen) dentro de la imagen."""
+    """Random pose (rvec, tvec) with the whole board (plus a one-square margin) inside the image."""
     W, H = squares[0] * square, squares[1] * square
-    # Contorno exterior del papel (un cuadro de margen), relativo a la primera esquina interior
+    # Outer outline of the paper (one-square margin), relative to the first inner corner
     outline = np.array([[-2 * square, -2 * square, 0], [W, -2 * square, 0],
                         [W, H, 0], [-2 * square, H, 0]], np.float64)
     center = np.array([W / 2 - square, H / 2 - square, 0.0])
@@ -37,11 +37,11 @@ def random_pose(rng, K=K_TRUE, dist=DIST_TRUE, size=SIZE, squares=SQUARES, squar
         if (p[:, 0] > 5).all() and (p[:, 0] < size[0] - 5).all() and \
            (p[:, 1] > 5).all() and (p[:, 1] < size[1] - 5).all():
             return rvec.ravel(), tvec.ravel()
-    raise RuntimeError("No se encontró una pose válida")
+    raise RuntimeError("No valid pose found")
 
 
 def render_board(squares=SQUARES, pps=PX_PER_SQUARE):
-    """Imagen del tablero (blanco/negro) con un cuadro de margen blanco alrededor."""
+    """Board image (black/white) with a one-square white margin around it."""
     sx, sy = squares
     img = np.full(((sy + 2) * pps, (sx + 2) * pps), 255, np.uint8)
     for r in range(sy):
@@ -53,29 +53,29 @@ def render_board(squares=SQUARES, pps=PX_PER_SQUARE):
 
 def render_view(rvec, tvec, K=K_TRUE, dist=DIST_TRUE, size=SIZE, squares=SQUARES,
                 square=SQUARE_MM, pps=PX_PER_SQUARE, noise=2.0, rng=None):
-    """Imagen en gris que vería la cámara (K, dist) con el tablero en la pose dada.
+    """Grayscale image the camera (K, dist) would see with the board at the given pose.
 
-    Para cada píxel de salida: se quita la distorsión (undistortPoints), se corta
-    el rayo con el plano Z = 0 del tablero y se muestrea la textura del tablero.
+    For each output pixel: remove distortion (undistortPoints), intersect the
+    ray with the board plane Z = 0 and sample the board texture.
     """
     board = render_board(squares, pps)
     w, h = size
     u, v = np.meshgrid(np.arange(w, dtype=np.float64), np.arange(h, dtype=np.float64))
     pix = np.stack([u.ravel(), v.ravel()], axis=1).reshape(-1, 1, 2)
     ray = cv2.undistortPoints(pix, K, dist).reshape(-1, 2)
-    d = np.column_stack([ray, np.ones(len(ray))])           # dirección del rayo (cámara)
+    d = np.column_stack([ray, np.ones(len(ray))])           # ray direction (camera)
     R, _ = cv2.Rodrigues(np.asarray(rvec, np.float64))
     t = np.asarray(tvec, np.float64).ravel()
-    n = R[:, 2]                                             # normal del tablero en la cámara
+    n = R[:, 2]                                             # board normal in the camera frame
     s = (n @ t) / (d @ n)
-    P = d * s[:, None]                                      # punto 3D en la cámara
-    Xb = (P - t) @ R                                        # = R^T (P - t): coordenadas del tablero (mm)
-    # mm -> píxel de la textura. La esquina interior (0, 0) está en el píxel 2*pps - 0.5
+    P = d * s[:, None]                                      # 3D point in the camera frame
+    Xb = (P - t) @ R                                        # = R^T (P - t): board coordinates (mm)
+    # mm -> texture pixel. Inner corner (0, 0) is at pixel 2*pps - 0.5
     map_x = (Xb[:, 0] / square * pps + 2 * pps - 0.5).reshape(h, w).astype(np.float32)
     map_y = (Xb[:, 1] / square * pps + 2 * pps - 0.5).reshape(h, w).astype(np.float32)
     map_x[(s <= 0).reshape(h, w)] = -1
     img = cv2.remap(board, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=150)
-    img = cv2.GaussianBlur(img, (3, 3), 0.7)                # desenfoque leve de la óptica
+    img = cv2.GaussianBlur(img, (3, 3), 0.7)                # slight optical blur
     if noise > 0:
         rng = rng or np.random.default_rng(0)
         img = np.clip(img + rng.normal(0, noise, img.shape), 0, 255).astype(np.uint8)

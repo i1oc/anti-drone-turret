@@ -1,24 +1,32 @@
-# Configuración del sistema. Cambiad aquí los parámetros, no en el código.
+# System configuration. Change parameters here, not in the code.
 camera:
-  index: 0          # 0 = cámara integrada; prueba 1, 2... si usas una webcam USB
-  width: 640        # resolución de procesado (la misma con la que se calibra)
+  index: 0          # 0 = built-in camera; try 1, 2... for a USB webcam
+  width: 640        # processing resolution (the same used for calibration)
   height: 480
   fps: 30
-  mirror: false     # NO activar: el espejo rompe la geometría de la calibración
-  autofocus: false  # el autoenfoque cambia la focal y invalida la calibración
+  mirror: false     # DO NOT enable: mirroring breaks the calibration geometry
+  autofocus: false  # autofocus changes the focal length and invalidates the calibration
 
 display:
-  window_name: "Torreta antidron"
+  window_name: "Anti-drone turret"
   snapshot_dir: "data/snapshots"
 
 calibration:
-  # Tablero de ajedrez: número de CUADROS (no de esquinas). Esquinas interiores = cuadros - 1
-  squares_x: 11       # cuadros en horizontal  -> 10 esquinas interiores
-  squares_y: 8        # cuadros en vertical    -> 7 esquinas interiores
-  square_mm: 20.0     # lado del cuadro medido en la impresión
+  # Chessboard: number of SQUARES (not corners). Inner corners = squares - 1
+  squares_x: 11       # horizontal squares -> 10 inner corners
+  squares_y: 8        # vertical squares   -> 7 inner corners
+  square_mm: 20.0     # square side measured on the printout
   images_dir: "calibration/images"
   output: "calibration/calib.yaml"
   figures_dir: "docs/figures/calibration"
-  val_fraction: 0.2   # fracción de imágenes reservadas para el RMS de validación
-  seed: 0             # semilla de la partición entrenamiento/validación
-  alpha: 0.0          # getOptimalNewCameraMatrix: 0 = sin bordes negros, 1 = conserva todos los píxeles
+  val_fraction: 0.2   # fraction of images held out for the validation RMS
+  seed: 0             # seed of the training/validation split
+  alpha: 0.0          # getOptimalNewCameraMatrix: 0 = no black borders, 1 = keep all pixels
+
+cards:
+  card_mm: 90.0         # side of the printed card, white margin included
+  roi_fraction: 0.8     # cards are only searched in the central rectangle (fraction of width and height)
+  min_area_frac: 0.004  # minimum frame area relative to the ROI (rejects distant cards/noise)
+  block_size: 31        # adaptive threshold window (odd, larger than the frame thickness in px)
+  threshold_c: 10       # constant subtracted from the local mean in the adaptive threshold
+  rectified_px: 200     # side of the rectified card

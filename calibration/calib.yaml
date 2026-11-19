@@ -19,7 +19,7 @@ dist:
 date: '2026-11-18T19:03:32'
 rms: 0.22
 val_rms: 0.22862
-model: 4 coef. (k3 = 0)
+model: 4 coeffs (k3 = 0)
 std_fx_fy_cx_cy:
 - 0.5062
 - 0.465
@@ -33,10 +33,10 @@ board:
   squares_y: 8
   square_mm: 20.0
 models:
-  4 coef. (k3 = 0):
+  4 coeffs (k3 = 0):
     rms: 0.22
     val_rms: 0.22862
-  5 coef. (k1 k2 p1 p2 k3):
+  5 coeffs (k1 k2 p1 p2 k3):
     rms: 0.21999
     val_rms: 0.22867
 train_images:

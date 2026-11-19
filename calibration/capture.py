@@ -1,21 +1,21 @@
-"""Captura de imágenes del tablero para la calibración offline.
+"""Capture of chessboard images for offline calibration.
 
-Muestra la cámara en vivo, detecta el tablero en cada frame y guarda la imagen
-(sin overlay) al pulsar ESPACIO. Un mapa de cobertura en verde indica qué zonas
-de la imagen ya tienen tablero: hay que cubrir también bordes y esquinas, que es
-donde más se nota la distorsión.
+Shows the live camera, detects the board in every frame and saves the image
+(without overlay) when SPACE is pressed. A green coverage map shows which areas
+of the image already have a board: borders and corners must be covered too,
+since that is where distortion is most noticeable.
 
-Consejos: 20-30 imágenes; distintas distancias; inclinaciones de hasta ~45° en
-ambos ejes; tablero quieto al guardar (sin desenfoque de movimiento); misma
-resolución que el sistema (config.yaml).
+Tips: 20-30 images; different distances; tilts of up to ~45° on both axes;
+board still when saving (no motion blur); same resolution as the system
+(config.yaml).
 
-Uso:
+Usage:
     python calibration/capture.py [--camera 1]
 
-Teclas:
-    ESPACIO  guardar imagen (solo si se detecta el tablero)
-    z        deshacer: borra la última imagen guardada en esta sesión
-    q / ESC  salir
+Keys:
+    SPACE    save image (only if the board is detected)
+    z        undo: delete the last image saved in this session
+    q / ESC  quit
 """
 from __future__ import annotations
 
@@ -34,27 +34,27 @@ from camera import ThreadedCamera  # noqa: E402
 from fps import FPSCounter, draw_stats  # noqa: E402
 from settings import load_config, project_path  # noqa: E402
 
-MIN_SHIFT_PX = 10.0  # una imagen casi idéntica a otra ya guardada no aporta información
+MIN_SHIFT_PX = 10.0  # an image almost identical to one already saved adds no information
 
 
 def outer_quad(corners: np.ndarray, pattern: tuple[int, int]) -> np.ndarray:
-    """Las 4 esquinas exteriores de la rejilla de esquinas detectadas."""
+    """The 4 outer corners of the grid of detected corners."""
     cols, rows = pattern
     g = corners.reshape(rows, cols, 2)
     return np.array([g[0, 0], g[0, -1], g[-1, -1], g[-1, 0]], np.int32)
 
 
 def add_coverage(coverage: np.ndarray, corners: np.ndarray, pattern: tuple[int, int]) -> None:
-    """Suma 1 en la zona que ocupa el tablero (para ver cuántas veces se ha cubierto cada zona)."""
+    """Add 1 over the area covered by the board (to see how many times each area has been covered)."""
     m = np.zeros(coverage.shape, np.uint8)
     cv2.fillConvexPoly(m, outer_quad(corners, pattern), 1)
     coverage += m
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Captura de imágenes de calibración")
-    p.add_argument("--camera", type=int, help="índice de la cámara (sobrescribe la config)")
-    p.add_argument("--out", type=Path, help="carpeta de salida (por defecto la de la config)")
+    p = argparse.ArgumentParser(description="Calibration image capture")
+    p.add_argument("--camera", type=int, help="camera index (overrides the config)")
+    p.add_argument("--out", type=Path, help="output folder (defaults to the one in the config)")
     args = p.parse_args()
 
     cfg = load_config()
@@ -68,10 +68,10 @@ def main() -> None:
                         cam_cfg.get("autofocus")) as cam:
         w, h = cam.resolution
         if (w, h) != (cam_cfg["width"], cam_cfg["height"]):
-            print(f"AVISO: la cámara da {w}x{h} y la config pide "
-                  f"{cam_cfg['width']}x{cam_cfg['height']}. Hay que calibrar a la resolución de uso.")
+            print(f"WARNING: the camera gives {w}x{h} and the config asks for "
+                  f"{cam_cfg['width']}x{cam_cfg['height']}. Calibrate at the working resolution.")
 
-        # Cobertura acumulada (incluye las imágenes que ya hubiera en la carpeta)
+        # Accumulated coverage (includes any images already in the folder)
         coverage = np.zeros((h, w), np.float32)
         saved: list[np.ndarray] = []
         existing = sorted(out_dir.glob("*.png"))
@@ -83,13 +83,13 @@ def main() -> None:
             if c is not None:
                 add_coverage(coverage, c, pattern)
                 saved.append(c.reshape(-1, 2))
-        print(f"{len(existing)} imágenes previas en {out_dir}. ESPACIO guarda, z deshace, q sale.")
+        print(f"{len(existing)} existing images in {out_dir}. SPACE saves, z undoes, q quits.")
 
         session_files: list[Path] = []
         session_corners: list[np.ndarray] = []
         fps = FPSCounter()
         last_id, msg, msg_t = -1, "", 0.0
-        window = "Captura de calibracion"
+        window = "Calibration capture"
         cv2.namedWindow(window, cv2.WINDOW_NORMAL)
 
         while True:
@@ -113,8 +113,8 @@ def main() -> None:
                 cv2.drawChessboardCorners(out, pattern, corners, True)
             pct = 100.0 * np.count_nonzero(coverage) / coverage.size
             n_total = len(saved)
-            lines = [f"FPS: {fps.tick():.1f}", f"Imagenes: {n_total}  Cobertura: {pct:.0f}%",
-                     "TABLERO OK" if corners is not None else "sin tablero"]
+            lines = [f"FPS: {fps.tick():.1f}", f"Images: {n_total}  Coverage: {pct:.0f}%",
+                     "BOARD OK" if corners is not None else "no board"]
             if msg and time.time() - msg_t < 2.0:
                 lines.append(msg)
             draw_stats(out, lines)
@@ -125,20 +125,20 @@ def main() -> None:
                 break
             if key == ord(" "):
                 if corners is None:
-                    msg = "No se ve el tablero entero"
+                    msg = "The whole board is not visible"
                 else:
                     pts = corners.reshape(-1, 2)
                     shift = min((np.linalg.norm(pts - s, axis=1).mean() for s in saved), default=np.inf)
                     if shift < MIN_SHIFT_PX:
-                        msg = "Casi igual que otra: mueve o inclina el tablero"
+                        msg = "Almost the same as another one: move or tilt the board"
                     else:
                         name = out_dir / f"calib_{time.strftime('%Y%m%d_%H%M%S')}_{frame_id}.png"
-                        cv2.imwrite(str(name), frame)  # imagen limpia, sin overlay
+                        cv2.imwrite(str(name), frame)  # clean image, no overlay
                         add_coverage(coverage, corners, pattern)
                         saved.append(pts)
                         session_files.append(name)
                         session_corners.append(pts)
-                        msg = f"Guardada {name.name}"
+                        msg = f"Saved {name.name}"
                         print(msg)
                 msg_t = time.time()
             if key == ord("z") and session_files:
@@ -146,11 +146,11 @@ def main() -> None:
                 pts = session_corners.pop()
                 f.unlink(missing_ok=True)
                 saved = [s for s in saved if s is not pts]
-                # Reconstruir la cobertura sin la imagen borrada
+                # Rebuild the coverage without the deleted image
                 coverage[:] = 0
                 for s in saved:
                     add_coverage(coverage, s, pattern)
-                msg, msg_t = f"Borrada {f.name}", time.time()
+                msg, msg_t = f"Deleted {f.name}", time.time()
                 print(msg)
 
     cv2.destroyAllWindows()

@@ -1,8 +1,8 @@
-"""Captura de vídeo en un hilo aparte.
+"""Video capture in a separate thread.
 
-cap.read() bloquea hasta que llega el siguiente frame. Si se llama en el bucle
-principal, el procesado espera a la cámara. Con un hilo dedicado, el bucle
-principal siempre recoge el frame más reciente al instante.
+cap.read() blocks until the next frame arrives. If it is called in the main
+loop, processing waits for the camera. With a dedicated thread, the main loop
+always gets the most recent frame instantly.
 """
 from __future__ import annotations
 
@@ -16,24 +16,24 @@ import cv2
 class ThreadedCamera:
     def __init__(self, index: int = 0, width: int = 640, height: int = 480, fps: int = 30,
                  autofocus: bool | None = None):
-        # En Windows, DirectShow abre la cámara más rápido y sin avisos
+        # On Windows, DirectShow opens the camera faster and without warnings
         backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_ANY
         self.cap = cv2.VideoCapture(index, backend)
         if not self.cap.isOpened():
-            raise RuntimeError(f"No se pudo abrir la cámara {index}. Prueba con otro índice.")
+            raise RuntimeError(f"Could not open camera {index}. Try another index.")
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_FPS, fps)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # no acumular frames viejos
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # do not queue old frames
         if autofocus is not None:
-            # Con el autoenfoque activo la focal cambia y la calibración deja de valer.
-            # Si la cámara no lo soporta, set() devuelve False y no pasa nada.
+            # With autofocus on, the focal length changes and the calibration is no longer valid.
+            # If the camera does not support it, set() returns False and nothing happens.
             self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 1 if autofocus else 0)
 
         ok, frame = self.cap.read()
         if not ok:
-            raise RuntimeError("La cámara se abrió pero no devuelve imágenes.")
+            raise RuntimeError("The camera opened but returns no images.")
 
         self._frame = frame
         self._frame_id = 0
@@ -58,7 +58,7 @@ class ThreadedCamera:
                 self._frame_id += 1
 
     def read(self):
-        """Devuelve (id, frame). El id permite saber si el frame es nuevo."""
+        """Return (id, frame). The id tells whether the frame is new."""
         with self._lock:
             return self._frame_id, self._frame
 

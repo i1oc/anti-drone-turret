@@ -1,4 +1,4 @@
-"""Tests de la calibración con una cámara virtual de parámetros conocidos."""
+"""Calibration tests with a virtual camera of known parameters."""
 import cv2
 import numpy as np
 import pytest
@@ -13,7 +13,7 @@ OBJ = board_points(PATTERN, synth.SQUARE_MM)
 
 
 def synthetic_views(n, noise_px=0.1, seed=0):
-    """n vistas: puntos 3D, proyecciones con ruido gaussiano y poses verdaderas."""
+    """n views: 3D points, projections with Gaussian noise and true poses."""
     rng = np.random.default_rng(seed)
     obj_pts, img_pts = [], []
     for _ in range(n):
@@ -32,8 +32,8 @@ def test_pattern_size_from_squares():
 def test_board_points_follow_opencv_order():
     assert OBJ.shape == (70, 3)
     np.testing.assert_allclose(OBJ[0], [0, 0, 0])
-    np.testing.assert_allclose(OBJ[1], [20, 0, 0])     # se avanza primero en X (a lo largo de la fila)
-    np.testing.assert_allclose(OBJ[10], [0, 20, 0])    # la fila siguiente
+    np.testing.assert_allclose(OBJ[1], [20, 0, 0])     # X advances first (along the row)
+    np.testing.assert_allclose(OBJ[10], [0, 20, 0])    # the next row
     np.testing.assert_allclose(OBJ[-1], [180, 120, 0])
 
 
@@ -54,7 +54,7 @@ def test_per_view_rms_matches_own_residuals():
     own = [rms_of([reprojection_residuals(o, i, r, t, res["K"], res["dist"])])
            for o, i, r, t in zip(obj, img, res["rvecs"], res["tvecs"])]
     np.testing.assert_allclose(own, res["per_view_rms"], atol=1e-3)
-    # El RMS global de OpenCV es el de todos los puntos juntos
+    # OpenCV's global RMS is the one over all points together
     all_res = [reprojection_residuals(o, i, r, t, res["K"], res["dist"])
                for o, i, r, t in zip(obj, img, res["rvecs"], res["tvecs"])]
     assert rms_of(all_res) == pytest.approx(res["rms"], abs=1e-3)
@@ -86,7 +86,7 @@ def test_find_corners_on_rendered_image(seed):
     assert corners is not None and corners.shape == (70, 1, 2)
     truth, _ = cv2.projectPoints(OBJ, rvec, tvec, synth.K_TRUE, synth.DIST_TRUE)
     err = np.linalg.norm(corners.reshape(-1, 2) - truth.reshape(-1, 2), axis=1)
-    assert err.mean() < 0.25 and err.max() < 0.8   # mismo orden y precisión subpíxel
+    assert err.mean() < 0.25 and err.max() < 0.8   # same order and subpixel accuracy
 
 
 def test_find_corners_returns_none_without_board():
