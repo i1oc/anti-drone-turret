@@ -1,30 +1,30 @@
-# Torreta antidrón virtual con objetivos reales
+# Virtual anti-drone turret with real targets
 
-Proyecto final de **Visión por Ordenador I** · 3º Ingeniería Matemática · Universidad Pontificia Comillas ICAI · curso 2026/27.
+Final project for **Computer Vision I** · 3rd year, Mathematical Engineering · Universidad Pontificia Comillas ICAI · academic year 2026/27.
 
-Una cámara real fija vigila una zona por la que se mueven objetivos físicos (pelotas de colores colgadas como péndulos) que hacen de "drones". El sistema permanece **bloqueado** hasta que el operador muestra a la cámara una secuencia de 4 tarjetas impresas en el orden correcto. Una vez **armado**, detecta y sigue cada objetivo con un filtro de Kalman, y una torreta **virtual** dibujada en pantalla gira, apunta con adelanto y dispara un proyectil virtual cuando prevé un impacto.
+A fixed real camera watches an area where physical targets (coloured balls hanging like pendulums) move around acting as "drones". The system stays **locked** until the operator shows the camera a sequence of 4 printed cards in the right order. Once **armed**, it detects and tracks each target with a Kalman filter, and a **virtual** turret drawn on screen rotates, aims with lead and fires a virtual projectile when it predicts a hit.
 
-Todo es visión por ordenador clásica con Python y OpenCV, sin deep learning y sin hardware adicional.
+Everything is classical computer vision with Python and OpenCV, with no deep learning and no extra hardware.
 
-> **Estado:** cámara en tiempo real con FPS y calibración offline con corrección de distorsión.
+> **Status:** real-time camera with FPS, offline calibration with distortion correction and card detector.
 
-## Equipo
+## Team
 
-| Integrante | Módulo principal |
+| Member | Main module |
 | --- | --- |
-| _Nombre Apellido_ | Calibración y geometría |
-| _Nombre Apellido_ | Tarjetas y decodificador |
-| _Nombre Apellido_ | Detección y tracking |
-| _Nombre Apellido_ | Integración, evaluación y documentación |
+| _First Last_ | Calibration and geometry |
+| _First Last_ | Cards and decoder |
+| _First Last_ | Detection and tracking |
+| _First Last_ | Integration, evaluation and documentation |
 
-Grupo: _A / B_
+Group: _A / B_
 
-## Instalación
+## Installation
 
-Requisitos: **Python 3.9** y Git. Las versiones de las librerías son las del entorno de prácticas del curso ([icai-voi/voi-26-27](https://github.com/icai-voi/voi-26-27)); OpenCV 4.8 y NumPy 1.26 no tienen versión para Python 3.13 o superior.
+Requirements: **Python 3.9** and Git. Library versions are those of the course lab environment ([icai-voi/voi-26-27](https://github.com/icai-voi/voi-26-27)); OpenCV 4.8 and NumPy 1.26 have no builds for Python 3.13 or later.
 
 ```bash
-git clone https://github.com/<usuario>/torreta-antidron.git
+git clone https://github.com/<user>/torreta-antidron.git
 cd torreta-antidron
 
 # Windows
@@ -39,63 +39,78 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## Uso
+## Usage
 
 ```bash
-python src/main.py            # cámara definida en config/config.yaml
-python src/main.py --camera 1 # otra cámara
+python src/main.py            # camera set in config/config.yaml
+python src/main.py --camera 1 # another camera
 pytest                        # tests
 ```
 
-### Calibración de la cámara (offline, una vez)
+### Camera calibration (offline, once)
 
-Tablero de 11×8 cuadros de 20 mm (10×7 esquinas interiores); las medidas están en `config/config.yaml`.
+Board of 11×8 squares of 20 mm (10×7 inner corners); the measurements are in `config/config.yaml`.
 
 ```bash
-python calibration/make_chessboard.py   # PDF A4: imprimir al 100 % y comprobar la regla de 50 mm
-python calibration/capture.py           # ESPACIO guarda, z deshace, q sale (20-30 imágenes)
-python calibration/calibrate.py         # K, distorsión, RMS y RMS de validación -> calibration/calib.yaml
+python calibration/make_chessboard.py   # A4 PDF: print at 100 % and check the 50 mm ruler
+python calibration/capture.py           # SPACE saves, z undoes, q quits (20-30 images)
+python calibration/calibrate.py         # K, distortion, RMS and validation RMS -> calibration/calib.yaml
 ```
 
-`calibrate.py` reserva un 20 % de las imágenes para medir el **RMS de validación** (error de
-reproyección en imágenes no usadas), compara el modelo de distorsión de 4 y 5 coeficientes y guarda
-las figuras del informe en `docs/figures/calibration/`. Con `--no-curve` omite la curva de error frente al
-número de imágenes, que es la parte lenta.
+`calibrate.py` holds out 20 % of the images to measure the **validation RMS** (reprojection error on
+unused images), compares the 4- and 5-coefficient distortion models and saves the report figures to
+`docs/figures/calibration/`. `--no-curve` skips the error vs number of images curve, which is the slow part.
 
-| Tecla | Acción |
+| Key | Action |
 | --- | --- |
-| `q` / `Esc` | Salir |
-| `s` | Guardar el frame actual en `data/snapshots/` |
-| `u` | Activar/desactivar la corrección de distorsión (requiere `calibration/calib.yaml`) |
+| `q` / `Esc` | Quit |
+| `s` | Save the current frame to `data/snapshots/` |
+| `u` | Toggle distortion correction (requires `calibration/calib.yaml`) |
+| `c` | Toggle the card detector |
+| `d` | Save the card detector stages to `data/debug/` |
 
-## Estructura del repositorio
+### Arming cards
+
+```bash
+python cards/make_cards.py   # PDF with the 8 cards of 90 mm (print at 100 %)
+```
+
+Each card is a thick black frame with a symbol: circle, bullseye, triangle, diamond, pentagon,
+3 bars, 4 dots and an X (CANCEL). The detector looks for the frame (adaptive threshold + contours +
+filter for quadrilaterals with a hole), straightens it with a homography and classifies the symbol with
+rotation-invariant features (number of pieces and holes, fill relative to the enclosing circle, solidity and vertices).
+
+## Repository structure
 
 ```text
 torreta-antidron/
-├── src/                # código del sistema
-│   ├── main.py         # punto de entrada y bucle en tiempo real
-│   ├── camera.py       # captura en un hilo aparte
-│   ├── camera_model.py # corrección de distorsión, píxel -> ángulos, profundidad
-│   ├── calib_utils.py  # detección del tablero, calibración, RMS de validación
-│   ├── settings.py     # rutas y lectura de la config
-│   └── fps.py          # FPS y overlay de rendimiento
-├── config/config.yaml  # parámetros (cámara, umbrales, código de armado...)
-├── calibration/        # scripts de calibración, imágenes del tablero y calib.yaml
-├── tests/              # tests con pytest
-├── docs/figures/       # figuras del informe
-└── data/               # vídeos y capturas de prueba (no se suben al repo)
+├── src/                # system code
+│   ├── main.py         # entry point and real-time loop
+│   ├── camera.py       # capture in a separate thread
+│   ├── camera_model.py # distortion correction, pixel -> angles, depth
+│   ├── calib_utils.py  # board detection, calibration, validation RMS
+│   ├── card_symbols.py # card design (single definition)
+│   ├── card_detector.py# card detector and classifier
+│   ├── settings.py     # paths and config loading
+│   └── fps.py          # FPS and performance overlay
+├── config/config.yaml  # parameters (camera, thresholds, arming code...)
+├── calibration/        # calibration scripts, board images and calib.yaml
+├── cards/              # card PDF generator
+├── tests/              # pytest tests
+├── docs/figures/       # report figures
+└── data/               # test videos and captures (not committed)
 ```
 
-## Hoja de ruta
+## Roadmap
 
-- [x] Lectura de la cámara en tiempo real con FPS
-- [x] Calibración offline (K, distorsión, RMS) y corrección de distorsión (RMS 0.22 px, validación 0.23 px)
-- [ ] Detector de tarjetas de armado
-- [ ] Decodificador de secuencia (máquina de estados)
-- [ ] Detección y tracking multiobjetivo (Kalman + asignación húngara)
-- [ ] Control de tiro: torreta virtual, apuntado con adelanto, IFF, radar
-- [ ] Evaluación cuantitativa y vídeo demo
+- [x] Real-time camera capture with FPS
+- [x] Offline calibration (K, distortion, RMS) and distortion correction (RMS 0.22 px, validation 0.23 px)
+- [x] Arming card detector
+- [ ] Sequence decoder (state machine)
+- [ ] Multi-target detection and tracking (Kalman + Hungarian assignment)
+- [ ] Fire control: virtual turret, lead aiming, IFF, radar
+- [ ] Quantitative evaluation and demo video
 
-## Uso de asistentes de IA
+## Use of AI assistants
 
-Se ha utilizado Claude (Anthropic) como asistente de diseño y programación. Todo el código ha sido revisado, probado y entendido por el equipo.
+Claude (Anthropic) was used as a design and programming assistant. All code has been reviewed, tested and understood by the team.

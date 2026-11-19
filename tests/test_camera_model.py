@@ -1,4 +1,4 @@
-"""Tests del modelo de cámara: ángulos, corrección de distorsión y profundidad."""
+"""Camera model tests: angles, distortion correction and depth."""
 import cv2
 import numpy as np
 import pytest
@@ -16,9 +16,9 @@ def test_angles_basic_directions():
     az, el = angles_from_normalized(0.0, 0.0)
     assert az == 0 and el == 0
     az, el = angles_from_normalized(1.0, 0.0)
-    assert np.degrees(az) == pytest.approx(45)     # derecha = azimut positivo
+    assert np.degrees(az) == pytest.approx(45)     # right = positive azimuth
     az, el = angles_from_normalized(0.0, -1.0)
-    assert np.degrees(el) == pytest.approx(45)     # arriba (y negativa) = elevación positiva
+    assert np.degrees(el) == pytest.approx(45)     # up (negative y) = positive elevation
     _, el = angles_from_normalized(1.0, 1.0)
     assert np.degrees(el) == pytest.approx(-np.degrees(np.arctan(1 / np.sqrt(2))))
 
@@ -38,7 +38,7 @@ def test_principal_point_is_optical_axis(cam):
 
 
 def test_pixel_to_angles_recovers_known_directions(cam):
-    """Se proyecta un rayo de dirección conocida con distorsión y se recupera su ángulo."""
+    """A ray of known direction is projected with distortion and its angle is recovered."""
     rng = np.random.default_rng(1)
     az, el = rng.uniform(-0.4, 0.4, 30), rng.uniform(-0.3, 0.3, 30)
     x, y = normalized_from_angles(az, el)
@@ -58,7 +58,7 @@ def test_angles_same_in_original_and_undistorted_image(cam):
 
 
 def test_undistort_straightens_board_lines(cam):
-    """Tras corregir, las filas de esquinas del tablero deben ser rectas."""
+    """After correction, the rows of board corners must be straight."""
     rvec, tvec = synth.random_pose(np.random.default_rng(4))
     from calib_utils import board_points, pattern_size
     obj = board_points(pattern_size(*synth.SQUARES), synth.SQUARE_MM)
@@ -69,7 +69,7 @@ def test_undistort_straightens_board_lines(cam):
         for row in p.reshape(7, 10, 2):
             c = row - row.mean(0)
             _, s, _ = np.linalg.svd(c)
-            dev = max(dev, s[1] / np.sqrt(len(row)))   # desviación respecto a la recta ajustada
+            dev = max(dev, s[1] / np.sqrt(len(row)))   # deviation from the fitted line
         return dev
 
     assert max_line_dev(cam.undistort_points(pix.reshape(-1, 2))) < 0.01 < max_line_dev(pix)

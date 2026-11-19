@@ -1,17 +1,17 @@
-"""Calibración offline de la cámara con las imágenes del tablero (método de Zhang).
+"""Offline camera calibration from the chessboard images (Zhang's method).
 
-Pasos:
-  1. findChessboardCorners + cornerSubPix en todas las imágenes.
-  2. Partición reproducible en entrenamiento / validación (config: val_fraction, seed).
-  3. calibrateCamera con dos modelos de distorsión: 5 coeficientes (k1, k2, p1, p2, k3)
-     y 4 coeficientes (k3 = 0). El RMS de calibración siempre baja al añadir
-     parámetros; el de VALIDACIÓN detecta el sobreajuste. Se elige el modelo más
-     simple salvo que el más complejo mejore la validación al menos un 2 %.
-  4. Guarda calibration/calib.yaml y las figuras del informe en docs/figures/calibration/.
+Steps:
+  1. findChessboardCorners + cornerSubPix on every image.
+  2. Reproducible training / validation split (config: val_fraction, seed).
+  3. calibrateCamera with two distortion models: 5 coefficients (k1, k2, p1, p2, k3)
+     and 4 coefficients (k3 = 0). The calibration RMS always drops when parameters
+     are added; the VALIDATION RMS detects overfitting. The simplest model is
+     chosen unless the more complex one improves validation by at least 2 %.
+  4. Saves calibration/calib.yaml and the report figures to docs/figures/calibration/.
 
-Uso:
+Usage:
     python calibration/calibrate.py
-    python calibration/calibrate.py --images otra/carpeta --no-curve
+    python calibration/calibrate.py --images other/folder --no-curve
 """
 from __future__ import annotations
 
@@ -34,25 +34,25 @@ from calib_utils import (board_points, calibrate, find_corners, pattern_size,  #
 from camera_model import CameraModel  # noqa: E402
 from settings import load_config, project_path  # noqa: E402
 
-MODELS = [  # de más simple a más complejo
-    ("4 coef. (k3 = 0)", cv2.CALIB_FIX_K3),
-    ("5 coef. (k1 k2 p1 p2 k3)", 0),
+MODELS = [  # from simplest to most complex
+    ("4 coeffs (k3 = 0)", cv2.CALIB_FIX_K3),
+    ("5 coeffs (k1 k2 p1 p2 k3)", 0),
 ]
-MIN_GAIN = 0.02  # mejora relativa mínima del RMS de validación para aceptar un modelo más complejo
+MIN_GAIN = 0.02  # minimum relative improvement of the validation RMS to accept a more complex model
 STD_NAMES = ["fx", "fy", "cx", "cy", "k1", "k2", "p1", "p2", "k3"]
 
-# Paleta categórica (validada para daltonismo): entrenamiento = azul, validación = naranja
+# Categorical palette (colour-blind safe): training = blue, validation = orange
 C_TRAIN, C_VAL = "#2a78d6", "#eb6834"
 INK, MUTED, GRID = "#2b2b2b", "#6b6b6b", "#e4e4e4"
 
 
-# ----------------------------------------------------------------------------- análisis
+# ----------------------------------------------------------------------------- analysis
 
 def error_vs_num_images(obj, img, size, flags, val_obj, val_img, n_values, repeats=10, seed=0):
-    """RMS de calibración y de validación frente al nº de imágenes (pregunta A.3 de la práctica 2).
+    """Calibration and validation RMS versus number of images (question A.3 of lab 2).
 
-    Para cada n se calibra con n imágenes de entrenamiento elegidas al azar y se
-    valida siempre con el mismo conjunto de validación.
+    For each n, calibrate with n randomly chosen training images and always
+    validate on the same validation set.
     """
     rng = np.random.default_rng(seed)
     rows = []
@@ -67,7 +67,7 @@ def error_vs_num_images(obj, img, size, flags, val_obj, val_img, n_values, repea
     return np.array(rows)
 
 
-# ----------------------------------------------------------------------------- figuras
+# ----------------------------------------------------------------------------- figures
 
 def _style(ax):
     for s in ("top", "right"):
@@ -80,7 +80,7 @@ def _style(ax):
 
 
 def fig_corners(paths, corners, pattern, out):
-    """Hasta 4 ejemplos de detección de esquinas."""
+    """Up to 4 examples of corner detection."""
     sel = np.linspace(0, len(paths) - 1, min(4, len(paths))).astype(int)
     fig, axes = plt.subplots(1, len(sel), figsize=(4 * len(sel), 3.2))
     for ax, i in zip(np.atleast_1d(axes), sel):
@@ -102,14 +102,14 @@ def fig_per_image_error(names_tr, err_tr, names_va, err_va, rms, val_rms, out):
     fig, ax = plt.subplots(figsize=(max(6, 0.32 * len(names) + 2), 3.6))
     _style(ax)
     ax.bar(x, err, color=colors, width=0.7)
-    l1 = ax.axhline(rms, color=C_TRAIN, lw=1.5, ls="--", label=f"RMS calibración {rms:.3f} px")
-    l2 = ax.axhline(val_rms, color=C_VAL, lw=1.5, ls=":", label=f"RMS validación {val_rms:.3f} px")
+    l1 = ax.axhline(rms, color=C_TRAIN, lw=1.5, ls="--", label=f"Calibration RMS {rms:.3f} px")
+    l2 = ax.axhline(val_rms, color=C_VAL, lw=1.5, ls=":", label=f"Validation RMS {val_rms:.3f} px")
     ax.set_xticks(x)
     ax.set_xticklabels([str(i) for i in range(len(names))], fontsize=7)
-    ax.set_xlabel("Imagen (índice en calib.yaml)", color=INK)
-    ax.set_ylabel("Error RMS de reproyección [px]", color=INK)
+    ax.set_xlabel("Image (index in calib.yaml)", color=INK)
+    ax.set_ylabel("RMS reprojection error [px]", color=INK)
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color=C_TRAIN, label="Entrenamiento"), Patch(color=C_VAL, label="Validación"),
+    ax.legend(handles=[Patch(color=C_TRAIN, label="Training"), Patch(color=C_VAL, label="Validation"),
                        l1, l2], frameon=False, fontsize=8, ncol=4, loc="lower center",
               bbox_to_anchor=(0.5, 1.0))
     fig.tight_layout()
@@ -118,13 +118,13 @@ def fig_per_image_error(names_tr, err_tr, names_va, err_va, rms, val_rms, out):
 
 
 def fig_residuals(res_tr, res_va, out):
-    """Nube de residuos (proyección − detección). Debe ser redonda y centrada en 0."""
+    """Residual cloud (projection − detection). It should be round and centred at 0."""
     rt, rv = np.concatenate(res_tr), np.concatenate(res_va)
     lim = max(0.6, np.abs(np.concatenate([rt, rv])).max() * 1.1)
     fig, ax = plt.subplots(figsize=(4.4, 4.4))
     _style(ax)
-    ax.scatter(rt[:, 0], rt[:, 1], s=6, color=C_TRAIN, alpha=0.5, marker="o", lw=0, label="Entrenamiento")
-    ax.scatter(rv[:, 0], rv[:, 1], s=10, color=C_VAL, alpha=0.7, marker="^", lw=0, label="Validación")
+    ax.scatter(rt[:, 0], rt[:, 1], s=6, color=C_TRAIN, alpha=0.5, marker="o", lw=0, label="Training")
+    ax.scatter(rv[:, 0], rv[:, 1], s=10, color=C_VAL, alpha=0.7, marker="^", lw=0, label="Validation")
     ax.add_patch(plt.Circle((0, 0), 0.5, fill=False, color=MUTED, ls="--", lw=1))
     ax.text(0.36, 0.36, "0.5 px", color=MUTED, fontsize=8)
     ax.set_xlim(-lim, lim)
@@ -139,7 +139,7 @@ def fig_residuals(res_tr, res_va, out):
 
 
 def fig_coverage(corners_tr, corners_va, size, out):
-    """Posición de todas las esquinas usadas: deben cubrir toda la imagen, bordes incluidos."""
+    """Position of every corner used: they should cover the whole image, borders included."""
     w, h = size
     fig, ax = plt.subplots(figsize=(5.6, 4.4))
     _style(ax)
@@ -156,8 +156,8 @@ def fig_coverage(corners_tr, corners_va, size, out):
     ax.set_aspect("equal")
     ax.set_xlabel("u [px]", color=INK)
     ax.set_ylabel("v [px]", color=INK)
-    ax.plot([], [], ".", color=C_TRAIN, label="Entrenamiento")
-    ax.plot([], [], "^", color=C_VAL, label="Validación")
+    ax.plot([], [], ".", color=C_TRAIN, label="Training")
+    ax.plot([], [], "^", color=C_VAL, label="Validation")
     ax.legend(frameon=False, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=2)
     fig.tight_layout()
     fig.savefig(out, dpi=150)
@@ -165,7 +165,7 @@ def fig_coverage(corners_tr, corners_va, size, out):
 
 
 def fig_distortion_field(K, dist, size, out):
-    """Desplazamiento que introduce la lente: |píxel distorsionado − ideal| en cada punto."""
+    """Displacement introduced by the lens: |distorted pixel − ideal| at each point."""
     w, h = size
     u, v = np.meshgrid(np.linspace(0, w - 1, 64), np.linspace(0, h - 1, 48))
     pix = np.stack([u.ravel(), v.ravel()], 1).reshape(-1, 1, 2)
@@ -185,18 +185,18 @@ def fig_distortion_field(K, dist, size, out):
     ax.set_ylim(h, 0)
     ax.set_xlabel("u [px]", color=INK)
     ax.set_ylabel("v [px]", color=INK)
-    fig.colorbar(cs, ax=ax, label="Desplazamiento por distorsión [px]", shrink=0.85)
+    fig.colorbar(cs, ax=ax, label="Distortion displacement [px]", shrink=0.85)
     fig.tight_layout()
     fig.savefig(out, dpi=150)
     plt.close(fig)
 
 
 def fig_undistort(path, model, out):
-    """Imagen original y corregida lado a lado."""
+    """Original and undistorted image side by side."""
     im = cv2.imread(str(path))
     und = model.undistort(im)
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
-    for ax, x, t in zip(axes, (im, und), ("Original", "Corregida (remap)")):
+    for ax, x, t in zip(axes, (im, und), ("Original", "Undistorted (remap)")):
         ax.imshow(cv2.cvtColor(x, cv2.COLOR_BGR2RGB))
         ax.set_title(t, color=INK, fontsize=10)
         ax.axis("off")
@@ -206,7 +206,7 @@ def fig_undistort(path, model, out):
 
 
 def fig_extrinsics(obj, rvecs, tvecs, val_rvecs, val_tvecs, out):
-    """Posiciones del tablero respecto a la cámara: muestra la variedad de poses."""
+    """Board positions relative to the camera: shows the variety of poses."""
     fig = plt.figure(figsize=(5.6, 4.6))
     ax = fig.add_subplot(projection="3d")
     cols, rows = obj[:, 0].max(), obj[:, 1].max()
@@ -215,10 +215,10 @@ def fig_extrinsics(obj, rvecs, tvecs, val_rvecs, val_tvecs, out):
                      [(r, t, C_VAL) for r, t in zip(val_rvecs, val_tvecs)]:
         R, _ = cv2.Rodrigues(rv)
         p = quad @ R.T + np.ravel(tv)
-        # ejes del gráfico: X derecha, Z (profundidad) al fondo, -Y arriba
+        # plot axes: X right, Z (depth) into the page, -Y up
         ax.plot(p[:, 0], p[:, 2], -p[:, 1], color=c, lw=1.2)
     s = 0.15 * np.max(np.abs(np.concatenate([np.ravel(t) for t in list(tvecs) + list(val_tvecs)])))
-    # Cámara como pirámide: vértice en el centro óptico, base en Z = s
+    # Camera as a pyramid: apex at the optical centre, base at Z = s
     base = np.array([[-s, -.75 * s, s], [s, -.75 * s, s], [s, .75 * s, s], [-s, .75 * s, s], [-s, -.75 * s, s]])
     ax.plot(base[:, 0], base[:, 2], -base[:, 1], color=INK, lw=1)
     for b in base[:4]:
@@ -226,8 +226,8 @@ def fig_extrinsics(obj, rvecs, tvecs, val_rvecs, val_tvecs, out):
     ax.set_xlabel("X [mm]")
     ax.set_ylabel("Z [mm]")
     ax.set_zlabel("−Y [mm]")
-    ax.plot([], [], color=C_TRAIN, label="Entrenamiento")
-    ax.plot([], [], color=C_VAL, label="Validación")
+    ax.plot([], [], color=C_TRAIN, label="Training")
+    ax.plot([], [], color=C_VAL, label="Validation")
     ax.legend(frameon=False, fontsize=8, loc="upper left")
     fig.tight_layout()
     fig.savefig(out, dpi=150)
@@ -238,10 +238,10 @@ def fig_error_vs_n(rows, out):
     n, cm, cs, vm, vs = rows.T
     fig, ax = plt.subplots(figsize=(6.4, 3.6))
     _style(ax)
-    ax.errorbar(n, cm, yerr=cs, fmt="o-", color=C_TRAIN, ms=5, lw=2, capsize=3, label="Calibración")
-    ax.errorbar(n, vm, yerr=vs, fmt="^-", color=C_VAL, ms=6, lw=2, capsize=3, label="Validación")
-    ax.set_xlabel("Nº de imágenes de calibración", color=INK)
-    ax.set_ylabel("Error RMS de reproyección [px]", color=INK)
+    ax.errorbar(n, cm, yerr=cs, fmt="o-", color=C_TRAIN, ms=5, lw=2, capsize=3, label="Calibration")
+    ax.errorbar(n, vm, yerr=vs, fmt="^-", color=C_VAL, ms=6, lw=2, capsize=3, label="Validation")
+    ax.set_xlabel("Number of calibration images", color=INK)
+    ax.set_ylabel("RMS reprojection error [px]", color=INK)
     ax.set_ylim(bottom=0)
     ax.legend(frameon=False, fontsize=8)
     fig.tight_layout()
@@ -249,15 +249,15 @@ def fig_error_vs_n(rows, out):
     plt.close(fig)
 
 
-# ----------------------------------------------------------------------------- principal
+# ----------------------------------------------------------------------------- main
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Calibración offline de la cámara")
-    p.add_argument("--images", type=Path, help="carpeta de imágenes (por defecto la de la config)")
-    p.add_argument("--output", type=Path, help="YAML de salida (por defecto el de la config)")
-    p.add_argument("--figures", type=Path, help="carpeta de figuras (por defecto la de la config)")
-    p.add_argument("--no-figures", action="store_true", help="no generar figuras")
-    p.add_argument("--no-curve", action="store_true", help="no calcular la curva error vs nº imágenes")
+    p = argparse.ArgumentParser(description="Offline camera calibration")
+    p.add_argument("--images", type=Path, help="image folder (defaults to the one in the config)")
+    p.add_argument("--output", type=Path, help="output YAML (defaults to the one in the config)")
+    p.add_argument("--figures", type=Path, help="figures folder (defaults to the one in the config)")
+    p.add_argument("--no-figures", action="store_true", help="do not generate figures")
+    p.add_argument("--no-curve", action="store_true", help="skip the error vs number of images curve")
     args = p.parse_args()
 
     cfg = load_config()
@@ -271,9 +271,9 @@ def main() -> None:
 
     paths = sorted([*img_dir.glob("*.png"), *img_dir.glob("*.jpg")])
     if not paths:
-        raise SystemExit(f"No hay imágenes en {img_dir}. Captúralas con calibration/capture.py")
+        raise SystemExit(f"No images in {img_dir}. Capture them with calibration/capture.py")
 
-    # 1. Detección de esquinas
+    # 1. Corner detection
     size, ok_paths, corners, failed = None, [], [], []
     for f in paths:
         gray = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
@@ -281,31 +281,31 @@ def main() -> None:
         if size is None:
             size = s
         elif s != size:
-            raise SystemExit(f"{f.name} es {s[0]}x{s[1]} y las demás {size[0]}x{size[1]}")
+            raise SystemExit(f"{f.name} is {s[0]}x{s[1]} and the others {size[0]}x{size[1]}")
         c = find_corners(gray, pattern)
         if c is None:
             failed.append(f.name)
         else:
             ok_paths.append(f)
             corners.append(c)
-    print(f"Tablero {cal['squares_x']}x{cal['squares_y']} cuadros ({pattern[0]}x{pattern[1]} esquinas), "
-          f"{square:g} mm. Imágenes {size[0]}x{size[1]}")
-    print(f"Detectado en {len(ok_paths)}/{len(paths)} imágenes" + (f". Fallan: {failed}" if failed else ""))
+    print(f"Board {cal['squares_x']}x{cal['squares_y']} squares ({pattern[0]}x{pattern[1]} corners), "
+          f"{square:g} mm. Images {size[0]}x{size[1]}")
+    print(f"Detected in {len(ok_paths)}/{len(paths)} images" + (f". Failed: {failed}" if failed else ""))
     expected = (cfg["camera"]["width"], cfg["camera"]["height"])
     if size != expected:
-        print(f"AVISO: las imágenes son {size} y el sistema trabaja a {expected}: la calibración no valdrá.")
+        print(f"WARNING: the images are {size} and the system runs at {expected}: the calibration will not be valid.")
     if len(ok_paths) < 6:
-        raise SystemExit("Hacen falta al menos 6 imágenes válidas (recomendado 20-30).")
+        raise SystemExit("At least 6 valid images are needed (20-30 recommended).")
 
-    # 2. Partición entrenamiento / validación
+    # 2. Training / validation split
     tr, va = split_train_val(len(ok_paths), float(cal["val_fraction"]), int(cal["seed"]))
     obj_tr, img_tr = [obj] * len(tr), [corners[i] for i in tr]
     obj_va, img_va = [obj] * len(va), [corners[i] for i in va]
-    print(f"Entrenamiento: {len(tr)} imágenes · Validación: {len(va)} imágenes")
+    print(f"Training: {len(tr)} images · Validation: {len(va)} images")
 
-    # 3. Calibración con cada modelo de distorsión
+    # 3. Calibration with each distortion model
     results = []
-    print(f"\n{'Modelo':<26}{'RMS calib. [px]':>17}{'RMS valid. [px]':>17}")
+    print(f"\n{'Model':<26}{'Calib. RMS [px]':>17}{'Valid. RMS [px]':>17}")
     for name, flags in MODELS:
         r = calibrate(obj_tr, img_tr, size, flags)
         r["val_res"] = validation_residuals(obj_va, img_va, r["K"], r["dist"]) if len(va) else []
@@ -318,21 +318,21 @@ def main() -> None:
         if len(va) and r["val_rms"] < (1 - MIN_GAIN) * best["val_rms"]:
             best = r
     K, dist = best["K"], best["dist"]
-    print(f"Modelo elegido: {best['name']} (el complejo solo si mejora la validación > {MIN_GAIN:.0%})")
+    print(f"Chosen model: {best['name']} (the complex one only if it improves validation by > {MIN_GAIN:.0%})")
 
-    # Resumen
+    # Summary
     std = best["std_intrinsics"]
     print("\nK =\n", np.array2string(K, precision=2, suppress_small=True))
     for i, n in enumerate(STD_NAMES[:4]):
         v = [K[0, 0], K[1, 1], K[0, 2], K[1, 2]][i]
         print(f"  {n} = {v:8.2f} ± {std[i]:.2f} px")
     print("dist (k1 k2 p1 p2 k3) =", np.array2string(dist[:5], precision=4))
-    print(f"RMS calibración = {best['rms']:.4f} px · RMS validación = {best['val_rms']:.4f} px")
+    print(f"Calibration RMS = {best['rms']:.4f} px · Validation RMS = {best['val_rms']:.4f} px")
     fov_h = 2 * np.degrees(np.arctan(size[0] / (2 * K[0, 0])))
     fov_v = 2 * np.degrees(np.arctan(size[1] / (2 * K[1, 1])))
-    print(f"Campo de visión aprox. {fov_h:.1f}° x {fov_v:.1f}°")
+    print(f"Approx. field of view {fov_h:.1f}° x {fov_v:.1f}°")
 
-    # Error por imagen y posibles imágenes malas
+    # Per-image error and possible bad images
     err_tr = best["per_view_rms"]
     err_va = np.array([rms_of([r]) for r in best["val_res"]])
     names_tr = [ok_paths[i].name for i in tr]
@@ -341,7 +341,7 @@ def main() -> None:
     thr = max(1.0, all_err.mean() + 2 * all_err.std())
     bad = [(n, e) for n, e in zip(names_tr + names_va, all_err) if e > thr]
     if bad:
-        print(f"\nImágenes con error alto (> {thr:.2f} px): revisa si están movidas o mal detectadas")
+        print(f"\nImages with high error (> {thr:.2f} px): check whether they are blurred or badly detected")
         for n, e in bad:
             print(f"  {n}: {e:.3f} px")
 
@@ -358,34 +358,34 @@ def main() -> None:
         val_images={n: round(float(e), 4) for n, e in zip(names_va, err_va)},
         failed_images=failed,
     )
-    print(f"\nGuardado {out_yaml}")
+    print(f"\nSaved {out_yaml}")
 
     if args.no_figures:
         return
 
-    # 4. Figuras para el informe
+    # 4. Report figures
     fig_dir.mkdir(parents=True, exist_ok=True)
     res_tr = [reprojection_residuals(obj, img_tr[k], best["rvecs"][k], best["tvecs"][k], K, dist)
               for k in range(len(tr))]
     model = CameraModel(K, dist, size, float(cal.get("alpha", 0.0)))
     val_poses = [cv2.solvePnP(obj, c, K, dist)[1:] for c in img_va]
-    # Imagen para la comparación: la que tiene el tablero más lejos del centro (más distorsión)
+    # Image for the comparison: the one with the board farthest from the centre (most distortion)
     far = int(np.argmax([np.linalg.norm(c.reshape(-1, 2).mean(0) - K[:2, 2]) for c in corners]))
 
-    fig_corners(ok_paths, corners, pattern, fig_dir / "esquinas_detectadas.png")
+    fig_corners(ok_paths, corners, pattern, fig_dir / "detected_corners.png")
     fig_per_image_error(names_tr, err_tr, names_va, err_va, best["rms"], best["val_rms"],
-                        fig_dir / "error_por_imagen.png")
-    fig_residuals(res_tr, best["val_res"], fig_dir / "residuos.png")
-    fig_coverage(img_tr, img_va, size, fig_dir / "cobertura.png")
-    fig_distortion_field(K, dist, size, fig_dir / "campo_distorsion.png")
-    fig_undistort(ok_paths[far], model, fig_dir / "original_vs_corregida.png")
+                        fig_dir / "per_image_error.png")
+    fig_residuals(res_tr, best["val_res"], fig_dir / "residuals.png")
+    fig_coverage(img_tr, img_va, size, fig_dir / "coverage.png")
+    fig_distortion_field(K, dist, size, fig_dir / "distortion_field.png")
+    fig_undistort(ok_paths[far], model, fig_dir / "original_vs_undistorted.png")
     fig_extrinsics(obj, best["rvecs"], best["tvecs"], [p[0] for p in val_poses],
-                   [p[1] for p in val_poses], fig_dir / "poses_tablero.png")
+                   [p[1] for p in val_poses], fig_dir / "board_poses.png")
     if not args.no_curve and len(tr) >= 6 and len(va):
         n_values = list(range(3, len(tr) + 1, max(1, len(tr) // 10)))
         rows = error_vs_num_images(obj_tr, img_tr, size, best["flags"], obj_va, img_va, n_values)
-        fig_error_vs_n(rows, fig_dir / "error_vs_num_imagenes.png")
-    print(f"Figuras en {fig_dir}")
+        fig_error_vs_n(rows, fig_dir / "error_vs_num_images.png")
+    print(f"Figures in {fig_dir}")
 
 
 if __name__ == "__main__":

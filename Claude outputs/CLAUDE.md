@@ -49,7 +49,14 @@ src/calib_utils.py   board_points, find_corners, calibrate, RMS de validación, 
 src/camera_model.py  CameraModel: undistort (remap), pixel_to_angles, depth_from_diameter
 calibration/         make_chessboard.py, capture.py, calibrate.py, calib.yaml, images/ (47 fotos)
                      HECHO: RMS 0.220 px, validación 0.229 px, fx≈495, 4 coef. (k3 no aporta), remap ≈1 ms, 30 FPS
-config/config.yaml   cámara, display, calibration
+src/card_symbols.py  diseño de las 8 tarjetas (marco 0.14, margen 0.10, símbolo r 0.27) y render_card
+src/card_detector.py CardDetector: umbral adaptativo -> quads con hueco -> homografía 200x200 -> Otsu ->
+                     rasgos (pieces, holes, fill, solidity, vertices, regularity, tilt, elongation) -> reglas.
+                     Polígonos por nº de vértices (el relleno sube con desenfoque: el rombo/DIAMOND fallaba en pantalla real).
+                     'c' activa, 'd' guarda etapas + features.yaml. Sintético: 800/800 hasta 40°; 96-97 % a 55°,
+                     tarjeta pequeña y desenfoque, 0 confusiones, 0 falsos positivos en 300 fondos; ~6 ms
+cards/make_cards.py  cards_90mm.pdf: 4 tarjetas de 90 mm por A4
+config/config.yaml   cámara, display, calibration, cards
 tests/               pytest (pytest.ini: pythonpath=src); synth.py = cámara virtual para tests
 docs/figures/calibration/ · data/ (ignorado por git)
 .gitattributes / .gitignore (.venv y data/ excluidos)
@@ -70,7 +77,7 @@ docs/figures/calibration/ · data/ (ignorado por git)
    umbral adaptativo/Otsu → `findContours(RETR_TREE)` → cuadrilátero con hueco → homografía a 200×200 → rasgos
    invariantes (nº vértices `approxPolyDP`, anidamiento, circularidad, Hough) → clase o DESCONOCIDO. ROI central.
    `make_cards.py` genera las tarjetas imprimibles.
-3. **Decodificador** — máquina de estados BLOQUEADO → INTRODUCIENDO(1..4) → VERIFICAR → ARMADO (+ PENALIZACIÓN).
+3. **Decodificador** — máquina de estados LOCKED → ENTERING(1..4) → VERIFY → ARMED (+ PENALTY).
    Anti-rebote: N≈10 frames estables y exigir "sin tarjeta" entre lecturas. Reset: CANCELAR, timeout 8 s, tecla `r`.
    3 fallos → bloqueo 10/20/40 s. Código en `config.yaml`. Tests con secuencias simuladas (sin cámara).
 4. **Tracker** — HSV `inRange` por color (rojo con 2 rangos) → morfología → contornos → área + circularidad > 0.7 →
@@ -86,7 +93,10 @@ docs/figures/calibration/ · data/ (ignorado por git)
 
 ## Convenciones
 
-- Comentarios, docstrings, README y mensajes de commit en español. Commits pequeños por módulo.
+- **Repo en inglés**: comentarios, docstrings, README, textos en pantalla, identificadores, nombres de clases
+  (`CIRCLE`, `CANCEL`, `UNKNOWN`...), claves de rasgos, nombres de archivos generados y mensajes de commit.
+  Los estados del decodificador también irán en inglés (LOCKED, ENTERING, VERIFY, ARMED, PENALTY).
+  El chat con el usuario sigue en español. Commits pequeños por módulo.
 - Parámetros en `config/config.yaml`, no hardcodeados.
 - `tracking/` y `fire_control/`: **funciones/clases puras sin dependencias de OpenCV y con tests**. Se portarán a C#
   para un juego en Unity de otra asignatura (Paradigmas) a partir del 3 dic.

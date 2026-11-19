@@ -1,4 +1,4 @@
-"""Medida de FPS con media móvil exponencial y overlay de rendimiento."""
+"""FPS measurement with an exponential moving average and a performance overlay."""
 from __future__ import annotations
 import time
 
@@ -6,9 +6,9 @@ import cv2
 
 
 class FPSCounter:
-    """FPS suavizados con una media móvil exponencial (EMA).
+    """FPS smoothed with an exponential moving average (EMA).
 
-    Una EMA evita que el número salte de un frame a otro y es O(1) por frame.
+    An EMA keeps the number from jumping between frames and is O(1) per frame.
     """
 
     def __init__(self, alpha: float = 0.1):
@@ -28,7 +28,7 @@ class FPSCounter:
 
 
 def draw_stats(frame, lines: list[str], origin=(10, 24)) -> None:
-    """Dibuja líneas de texto con fondo oscuro para que se lean sobre cualquier imagen."""
+    """Draw text lines on a dark background so they are readable over any image."""
     x, y = origin
     for text in lines:
         (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
