@@ -65,7 +65,7 @@ def main() -> None:
     index = args.camera if args.camera is not None else cam_cfg["index"]
 
     with ThreadedCamera(index, cam_cfg["width"], cam_cfg["height"], cam_cfg["fps"],
-                        cam_cfg.get("autofocus")) as cam:
+                        cam_cfg.get("autofocus"), cam_cfg.get("exposure")) as cam:
         w, h = cam.resolution
         if (w, h) != (cam_cfg["width"], cam_cfg["height"]):
             print(f"WARNING: the camera gives {w}x{h} and the config asks for "
@@ -90,13 +90,17 @@ def main() -> None:
         fps = FPSCounter()
         last_id, msg, msg_t = -1, "", 0.0
         window = "Calibration capture"
-        cv2.namedWindow(window, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(window, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # resizing keeps the aspect ratio
 
+        pending_key = 255  # key pressed while waiting for a new frame (applied to the next one)
         while True:
             frame_id, frame = cam.read()
             if frame_id == last_id:
-                if (cv2.waitKey(1) & 0xFF) in (ord("q"), 27):
+                k = cv2.waitKey(1) & 0xFF
+                if k in (ord("q"), 27):
                     break
+                if k != 255:
+                    pending_key = k
                 continue
             last_id = frame_id
 
@@ -121,6 +125,8 @@ def main() -> None:
             cv2.imshow(window, out)
 
             key = cv2.waitKey(1) & 0xFF
+            if key == 255:
+                key, pending_key = pending_key, 255
             if key in (ord("q"), 27):
                 break
             if key == ord(" "):

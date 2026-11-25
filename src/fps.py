@@ -27,11 +27,25 @@ class FPSCounter:
         return self.fps
 
 
-def draw_stats(frame, lines: list[str], origin=(10, 24)) -> None:
-    """Draw text lines on a dark background so they are readable over any image."""
-    x, y = origin
+def draw_stats(frame, lines: list[str], corner: str = "bottom-left", scale: float = 0.42,
+               margin: int = 8) -> None:
+    """Draw small text lines on a dark box so they are readable over any image.
+
+    corner: "bottom-left" (default) or "top-left". The lines keep their order
+    (first line on top) in both cases.
+    """
+    font, thick, pad, gap = cv2.FONT_HERSHEY_SIMPLEX, 1, 4, 5
+    sizes = [cv2.getTextSize(t, font, scale, thick)[0] for t in lines]
+    if not sizes:
+        return
+    line_h = max(h for _, h in sizes)
+    box_w = max(w for w, _ in sizes) + 2 * pad
+    box_h = len(lines) * line_h + (len(lines) - 1) * gap + 2 * pad
+    x0 = margin
+    y0 = frame.shape[0] - margin - box_h if corner == "bottom-left" else margin
+    roi = frame[y0:y0 + box_h, x0:x0 + box_w]
+    roi[:] = (roi * 0.35).astype(roi.dtype)  # translucent background
+    y = y0 + pad + line_h
     for text in lines:
-        (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-        cv2.rectangle(frame, (x - 4, y - h - 6), (x + w + 4, y + 6), (0, 0, 0), -1)
-        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
-        y += h + 14
+        cv2.putText(frame, text, (x0 + pad, y), font, scale, (0, 255, 0), thick, cv2.LINE_AA)
+        y += line_h + gap
