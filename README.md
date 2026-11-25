@@ -6,7 +6,7 @@ A fixed real camera watches an area where physical targets (coloured balls hangi
 
 Everything is classical computer vision with Python and OpenCV, with no deep learning and no extra hardware.
 
-> **Status:** real-time camera with FPS, offline calibration with distortion correction and card detector.
+> **Status:** real-time camera with FPS, offline calibration with distortion correction, card detector, sequence decoder and multi-target tracker.
 
 ## Team
 
@@ -62,8 +62,9 @@ unused images), compares the 4- and 5-coefficient distortion models and saves th
 | `q` / `Esc` | Quit |
 | `s` | Save the current frame to `data/snapshots/` |
 | `u` | Toggle distortion correction (requires `calibration/calib.yaml`) |
-| `c` | Toggle the card detector |
+| `c` | Toggle the card overlay (frames, labels, features) |
 | `d` | Save the card detector stages to `data/debug/` |
+| `r` | Reset the sequence / disarm (does not shorten a penalty) |
 
 ### Arming cards
 
@@ -76,6 +77,47 @@ Each card is a thick black frame with a symbol: circle, bullseye, triangle, diam
 filter for quadrilaterals with a hole), straightens it with a homography and classifies the symbol with
 rotation-invariant features (number of pieces and holes, fill relative to the enclosing circle, solidity and vertices).
 
+### Sequence decoder
+
+The system starts **LOCKED**. Show the 4 cards of the code (`decoder.code` in `config/config.yaml`) one by one,
+holding each until the progress bar fills and removing it before the next one:
+
+```text
+LOCKED -> ENTERING (1..3 cards) -> VERIFY (4 cards) -> ARMED
+                                        |  wrong code (x3)
+                                        v
+                                     PENALTY (10 / 20 / 40 s) -> LOCKED
+```
+
+- A card is read when it appears in 6 of the last 10 frames, and it must be removed (10 empty frames)
+  before the next read (hysteresis: holding a card counts once).
+- The code is checked only after the 4th card, so a wrong first card is not revealed.
+- `CANCEL` card or `r` clears the sequence; 8 s without a new card clears it too.
+- Events are saved to `data/logs/decoder_*.csv` on exit (unlock time experiment).
+
+### Ball tracker (when ARMED)
+
+```bash
+python tools/pick_colors.py   # tune the colours: select with 1-2, click on the ball, 'w' saves config/colors.yaml
+```
+
+Targets: a mini fluorescent **tennis** ball (friend, never engaged) and a mini orange **basketball** (hostile).
+
+- **Detection:** HSV colour ranges (`cv2.inRange`) -> opening/closing -> contours ->
+  circularity >= 0.82 and fill >= 0.65 (rejects squares and other shapes) -> `minEnclosingCircle`.
+- **Basketball seams:** a 9 px closing fills the black seams inside the ball and the shape is measured on
+  the convex hull (seams reaching the edge leave notches; a rectangle stays a rectangle).
+- Optional per-colour **motion confirmation with MOG2** (for a colour the background also has); off for
+  both balls, so MOG2 does not run.
+- **Tracking:** one Kalman filter per target (constant velocity; constant acceleration selectable),
+  squared Mahalanobis distance with a chi-square 95 % gate, Hungarian assignment
+  (`scipy.optimize.linear_sum_assignment`) per colour, plus a second chance with a wider gate for
+  established tracks (a pendulum accelerates hard at the ends of the swing).
+- **Life cycle:** tentative -> confirmed after 3 hits (gets a visible id) -> lost (coasting on the
+  prediction) -> deleted after 10 misses.
+- **On screen:** bounding box, id, colour (green = FRIEND), trail, velocity arrow (0.25 s ahead), speed,
+  azimuth/elevation from the calibration and depth `Z = f*D/d` (`diameter_m` of each colour: measure your balls).
+
 ## Repository structure
 
 ```text
@@ -87,11 +129,16 @@ anti-drone-turret/
 │   ├── calib_utils.py  # board detection, calibration, validation RMS
 │   ├── card_symbols.py # card design (single definition)
 │   ├── card_detector.py# card detector and classifier
+│   ├── decoder.py      # sequence decoder (state machine, no OpenCV)
+│   ├── ball_detector.py# coloured ball detection (HSV)
+│   ├── tracking/       # Kalman, association, track management (no OpenCV)
+│   ├── hud.py          # on-screen panels
 │   ├── settings.py     # paths and config loading
 │   └── fps.py          # FPS and performance overlay
 ├── config/config.yaml  # parameters (camera, thresholds, arming code...)
 ├── calibration/        # calibration scripts, board images and calib.yaml
 ├── cards/              # card PDF generator
+├── tools/              # pick_colors.py (HSV tuning by clicking)
 ├── tests/              # pytest tests
 ├── docs/figures/       # report figures
 └── data/               # test videos and captures (not committed)
@@ -102,8 +149,8 @@ anti-drone-turret/
 - [x] Real-time camera capture with FPS
 - [x] Offline calibration (K, distortion, RMS) and distortion correction (RMS 0.22 px, validation 0.23 px)
 - [x] Arming card detector
-- [ ] Sequence decoder (state machine)
-- [ ] Multi-target detection and tracking (Kalman + Hungarian assignment)
+- [x] Sequence decoder (state machine)
+- [x] Multi-target detection and tracking (Kalman + Hungarian assignment)
 - [ ] Fire control: virtual turret, lead aiming, IFF, radar
 - [ ] Quantitative evaluation and demo video
 

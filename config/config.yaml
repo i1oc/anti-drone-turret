@@ -6,6 +6,8 @@ camera:
   fps: 30
   mirror: false     # DO NOT enable: mirroring breaks the calibration geometry
   autofocus: false  # autofocus changes the focal length and invalidates the calibration
+  exposure: null    # null = automatic. A fixed value (DirectShow: log2 seconds, e.g. -6 = 1/64 s) stops
+                    # the camera from burning bright balls against a dark background and keeps colours stable
 
 display:
   window_name: "Anti-drone turret"
@@ -30,3 +32,46 @@ cards:
   block_size: 31        # adaptive threshold window (odd, larger than the frame thickness in px)
   threshold_c: 10       # constant subtracted from the local mean in the adaptive threshold
   rectified_px: 200     # side of the rectified card
+
+decoder:
+  code: [TRIANGLE, CIRCLE, DOTS, DIAMOND]  # secret sequence (1-4 symbols, CANCEL not allowed)
+  window_frames: 10     # a card is read when it fills agree_frac of the last window_frames frames
+  agree_frac: 0.6       # (6 of 10 frames at 30 FPS: tolerates up to 40 % of missed detections)
+  timeout_s: 8.0        # a partial sequence is cleared after this long without a new card
+  max_failures: 3       # wrong codes in a row before a penalty
+  penalties_s: [10, 20, 40]  # escalating penalty durations (the last one repeats)
+
+tracker:
+  # Colour detection (HSV in OpenCV units: H 0-180, S and V 0-255)
+  colors:               # defaults; tools/pick_colors.py writes tuned ranges to colors_file
+    # Values measured on the real balls (H 0-180): tennis felt H 29-32, S 120-190; its lit top is
+    # overexposed (V 255) and pale (S 47-89). Basketball H 17-23, S 170-250. Black cloth H 18-23, S 60-85, V ~75.
+    tennis:             # fluorescent yellow-green tennis ball
+      ranges: [[[25, 40, 100], [40, 255, 255]]]   # low S to keep the pale overexposed top of the ball
+      close_px: 15        # bridges the white seam that crosses the ball
+      use_hull: true      # the seam leaves notches on the edge
+      diameter_m: 0.067   # standard tennis ball size
+    basketball:         # mini orange basketball; high S separates it from skin and from the tennis ball
+      ranges: [[[4, 150, 90], [25, 255, 255]]]
+      close_px: 9         # fills the black seams that cross the ball
+      group_px: 25        # close to the camera a wide seam splits the ball in two: group the halves
+      use_hull: true      # seams reaching the edge leave notches: shape measured on the convex hull
+      diameter_m: 0.067   # same size as a tennis ball
+  colors_file: "config/colors.yaml"   # tuned ranges (override the ones above) if the file exists
+  friend_colors: [tennis] # IFF: these targets are never engaged (basketball = hostile drone)
+  min_area: 80          # px^2; smaller blobs are noise
+  min_circularity: 0.82 # 4*pi*A/P^2: ball ~0.92, ball blurred by motion ~0.87, square 0.80
+  min_fill: 0.65        # area / enclosing circle area: ball ~0.94, blurred ball ~0.69, square 0.66
+  blur: 5
+  motion_min_frac: 0.15 # fraction of a motion_confirm blob that must be moving (MOG2)
+  ball_diameter_m: 0.07 # default real diameter for Z = f*D/d (per colour: diameter_m; measure your balls)
+  # Kalman filter and track management
+  model: cv             # cv = constant velocity, ca = constant acceleration
+  process_noise: 3000.0 # std of the unmodelled acceleration (px/s^2) for cv, of the jerk (px/s^3) for ca
+                        # (a pendulum swing of ~170 px and 1.6 s period reaches ~2800 px/s^2)
+  meas_noise_px: 2.0    # std of the measured centre (px)
+  gate: 5.991           # chi-square 95 % for 2 dof: max squared Mahalanobis distance to associate
+  relaxed_gate_factor: 4.0  # second chance for established tracks (pendulum accelerations)
+  confirm_hits: 3       # hits to confirm a new track (and give it a visible id)
+  max_misses: 10        # frames a confirmed track survives without detections (coasting)
+  tentative_max_misses: 2
