@@ -22,3 +22,8 @@ Thumbs.db
 desktop.ini
 .idea/
 .vscode/
+
+# Private assistant context (personal data): never commit
+CLAUDE.md
+Claude outputs/
+.claude/
